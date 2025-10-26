@@ -57,7 +57,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="entrypoint")
 
-    serve = subparsers.add_parser("serve", help="Start the FastAPI service via uvicorn.")
+    serve = subparsers.add_parser(
+        "serve", help="Start the FastAPI service via uvicorn."
+    )
     serve.add_argument("--host", default="127.0.0.1", help="Host interface to bind.")
     serve.add_argument("--port", type=int, default=8000, help="Port to listen on.")
     serve.add_argument(
