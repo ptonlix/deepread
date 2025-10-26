@@ -13,8 +13,12 @@ def test_summarizer_generates_summary_and_findings() -> None:
     report = summarizer.summarize(
         submission_id=submission_id,
         page_insights=[
-            PageInsight(page_index=0, text="Project goals are on track.", confidence=0.93),
-            PageInsight(page_index=1, text="Risks identified on budget.", confidence=0.88),
+            PageInsight(
+                page_index=0, text="Project goals are on track.", confidence=0.93
+            ),
+            PageInsight(
+                page_index=1, text="Risks identified on budget.", confidence=0.88
+            ),
         ],
     )
 
@@ -29,7 +33,9 @@ def test_summarizer_includes_low_confidence_warnings() -> None:
     summarizer = InsightSummarizer()
     report = summarizer.summarize(
         submission_id=uuid4(),
-        page_insights=[PageInsight(page_index=0, text="Unreadable text", confidence=0.4)],
+        page_insights=[
+            PageInsight(page_index=0, text="Unreadable text", confidence=0.4)
+        ],
     )
 
     assert report.warnings, "Expected warning when confidence is low"

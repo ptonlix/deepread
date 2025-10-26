@@ -24,7 +24,9 @@ def render_markdown(report: InsightReport) -> str:
 
     for finding in report.key_findings:
         refs = ", ".join(f"Page {ref}" for ref in finding.page_refs)
-        lines.append(f"- **{finding.title}** ({refs}, confidence {finding.confidence:.2f})")
+        lines.append(
+            f"- **{finding.title}** ({refs}, confidence {finding.confidence:.2f})"
+        )
         lines.append(indent(finding.description.strip(), "  "))
 
     lines.extend(["", "## Recommended Actions"])
@@ -58,7 +60,11 @@ def render_manifest(submissions: list[dict[str, Any]]) -> str:
     lines.append("|---------------|----------|--------|---------|-------------|")
     for item in submissions:
         outputs_obj = item.get("outputs")
-        outputs = ", ".join(sorted(outputs_obj.keys())) if isinstance(outputs_obj, dict) else "—"
+        outputs = (
+            ", ".join(sorted(outputs_obj.keys()))
+            if isinstance(outputs_obj, dict)
+            else "—"
+        )
         remediation = item.get("remediation") or "—"
         lines.append(
             f"| {item['submission_id']} | {item['filename']} | {item['status']} | {outputs} | {remediation} |"
@@ -78,12 +84,16 @@ def render_rich_text(report: InsightReport) -> str:
 
     for finding in report.key_findings:
         refs = ", ".join(f"Page {ref}" for ref in finding.page_refs)
-        lines.append(rf"\b {finding.title}\b0 ({refs}, confidence {finding.confidence:.2f})\line ")
+        lines.append(
+            rf"\b {finding.title}\b0 ({refs}, confidence {finding.confidence:.2f})\line "
+        )
         lines.append(finding.description.replace("\n", r"\line ") + r"\line ")
 
     lines.append(r"\line\b Recommended Actions\b0\line")
     for suggestion in report.action_suggestions:
-        lines.append(rf"{suggestion.instruction}\line Rationale: {suggestion.rationale}\line ")
+        lines.append(
+            rf"{suggestion.instruction}\line Rationale: {suggestion.rationale}\line "
+        )
 
     if report.warnings:
         lines.append(r"\line\b Warnings\b0\line")

@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 SUPPORTED_OUTPUT_FORMATS = {"markdown", "json", "rich_text"}
 
@@ -55,7 +55,9 @@ class InsightReport(BaseModel):
 
     @field_validator("key_findings")
     @classmethod
-    def _validate_key_findings(cls, value: list[InsightFinding]) -> list[InsightFinding]:
+    def _validate_key_findings(
+        cls, value: list[InsightFinding]
+    ) -> list[InsightFinding]:
         if not value:
             raise ValueError("At least one key finding is required.")
         return value
@@ -67,8 +69,12 @@ class InsightReport(BaseModel):
             raise ValueError("At least one generated format is required.")
         invalid = set(value.keys()) - SUPPORTED_OUTPUT_FORMATS
         if invalid:
-            raise ValueError(f"Unsupported output formats: {', '.join(sorted(invalid))}")
+            raise ValueError(
+                f"Unsupported output formats: {', '.join(sorted(invalid))}"
+            )
         for fmt, path in value.items():
             if not path:
-                raise ValueError(f"Generated format '{fmt}' must map to a non-empty path.")
+                raise ValueError(
+                    f"Generated format '{fmt}' must map to a non-empty path."
+                )
         return value

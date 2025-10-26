@@ -22,7 +22,9 @@ DEFAULT_RETRY_SUFFIX = (
 class InferenceEngine(Protocol):
     """Protocol capturing the pieces of vLLM we care about."""
 
-    def __call__(self, *, prompt: str, image_bytes: bytes, max_tokens: int) -> tuple[str, float]:
+    def __call__(
+        self, *, prompt: str, image_bytes: bytes, max_tokens: int
+    ) -> tuple[str, float]:
         ...
 
 
@@ -73,7 +75,9 @@ class DeepSeekOcr:
             if result_confidence >= self.confidence_threshold:
                 if attempt > 0:
                     warnings.append(f"OCR succeeded after {attempt} retry.")
-                return OcrOutput(text=result_text, confidence=result_confidence, warnings=warnings)
+                return OcrOutput(
+                    text=result_text, confidence=result_confidence, warnings=warnings
+                )
 
             if attempt < self.max_retries:
                 prompt = f"{self.base_prompt}\n\n{self.retry_prompt_suffix}"
@@ -84,10 +88,14 @@ class DeepSeekOcr:
             )
             break
 
-        return OcrOutput(text=result_text, confidence=result_confidence, warnings=warnings)
+        return OcrOutput(
+            text=result_text, confidence=result_confidence, warnings=warnings
+        )
 
 
-def run_ocr(*, image_bytes: bytes, engine_factory: Callable[[], InferenceEngine] | None = None) -> OcrOutput:
+def run_ocr(
+    *, image_bytes: bytes, engine_factory: Callable[[], InferenceEngine] | None = None
+) -> OcrOutput:
     """
     Convenience wrapper around :class:`DeepSeekOcr`.
 
@@ -97,7 +105,9 @@ def run_ocr(*, image_bytes: bytes, engine_factory: Callable[[], InferenceEngine]
     """
 
     if engine_factory is None:
-        raise NotImplementedError("engine_factory must be provided until vLLM wiring is implemented.")
+        raise NotImplementedError(
+            "engine_factory must be provided until vLLM wiring is implemented."
+        )
 
     engine = engine_factory()
     return DeepSeekOcr(engine=engine).run(image_bytes=image_bytes)

@@ -27,7 +27,9 @@ def _sample_report() -> InsightReport:
             )
         ],
         action_suggestions=[
-            ActionSuggestion(instruction="Follow up with owner.", rationale="Confidence 0.92.")
+            ActionSuggestion(
+                instruction="Follow up with owner.", rationale="Confidence 0.92."
+            )
         ],
         open_questions=["What is the revised timeline?"],
         generated_formats={"markdown": "insight.md", "json": "insight.json"},

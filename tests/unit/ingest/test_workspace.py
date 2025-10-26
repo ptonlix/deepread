@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -38,7 +37,9 @@ def test_workspace_cleanup_removes_contents(tmp_path: Path) -> None:
     assert not job_workspace.base_dir.exists()
 
 
-def test_purge_expired_deletes_old_workspaces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_purge_expired_deletes_old_workspaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     old_workspace = workspace.JobWorkspace(root=tmp_path, job_id="old")
     old_workspace.create()
 

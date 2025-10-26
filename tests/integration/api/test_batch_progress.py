@@ -16,10 +16,16 @@ def test_batch_progress_records_failures(tmp_path: Path) -> None:
         ("documents", ("unsupported.txt", b"plain text", "text/plain")),
     ]
 
-    response = client.post("/v1/jobs", files=files, data={"requestedOutputs": ["markdown"]})
+    response = client.post(
+        "/v1/jobs", files=files, data={"requestedOutputs": ["markdown"]}
+    )
     data = response.json()
 
-    failed = next(sub for sub in data["submissions"] if sub["originalFilename"] == "unsupported.txt")
+    failed = next(
+        sub
+        for sub in data["submissions"]
+        if sub["originalFilename"] == "unsupported.txt"
+    )
     assert failed["status"] == "failed"
     assert "Processing failed" in failed["remediation"]
 

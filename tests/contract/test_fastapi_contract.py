@@ -16,7 +16,9 @@ def test_create_job_and_fetch_status(tmp_path: Path) -> None:
         ("documents", ("doc2.html", b"<h1>Title</h1><p>Paragraph</p>", "text/html")),
     ]
 
-    response = client.post("/v1/jobs", files=files, data={"requestedOutputs": "markdown"})
+    response = client.post(
+        "/v1/jobs", files=files, data={"requestedOutputs": "markdown"}
+    )
     assert response.status_code == 202
     payload = response.json()
 
@@ -30,4 +32,6 @@ def test_create_job_and_fetch_status(tmp_path: Path) -> None:
 
     assert status_payload["jobId"] == job_id
     assert len(status_payload["submissions"]) == 2
-    assert any(sub.get("outputs") for sub in status_payload["submissions"])  # at least one successful output
+    assert any(
+        sub.get("outputs") for sub in status_payload["submissions"]
+    )  # at least one successful output

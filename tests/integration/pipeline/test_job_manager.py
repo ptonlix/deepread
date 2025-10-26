@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 import pytest
 
@@ -46,7 +46,9 @@ async def test_job_manager_enforces_concurrency_limit() -> None:
     await manager.wait_for_all()
 
     assert peak_active <= max_workers
-    assert all(manager.get_progress(job.job_id).status == JobStatus.COMPLETE for job in jobs)
+    assert all(
+        manager.get_progress(job.job_id).status == JobStatus.COMPLETE for job in jobs
+    )
 
 
 @pytest.mark.asyncio

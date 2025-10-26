@@ -17,7 +17,16 @@ def test_cli_fetch_json_and_rich_text(tmp_path: Path, monkeypatch) -> None:
 
     stdout = StringIO()
     with redirect_stdout(stdout):
-        main(["submit", str(doc), "--output-format", "json", "--output-format", "rich_text"])
+        main(
+            [
+                "submit",
+                str(doc),
+                "--output-format",
+                "json",
+                "--output-format",
+                "rich_text",
+            ]
+        )
     job_id = stdout.getvalue().strip().split()[-1]
 
     stdout = StringIO()

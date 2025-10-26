@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -26,11 +25,15 @@ def test_fetch_structured_outputs(tmp_path: Path) -> None:
     submission = payload["submissions"][0]
     submission_id = submission["submissionId"]
 
-    json_response = client.get(f"/v1/reports/{submission_id}/content", params={"format": "json"})
+    json_response = client.get(
+        f"/v1/reports/{submission_id}/content", params={"format": "json"}
+    )
     assert json_response.status_code == 200
     data = json_response.json()
     assert "summary" in data
 
-    rtf_response = client.get(f"/v1/reports/{submission_id}/content", params={"format": "rich_text"})
+    rtf_response = client.get(
+        f"/v1/reports/{submission_id}/content", params={"format": "rich_text"}
+    )
     assert rtf_response.status_code == 200
     assert rtf_response.text.startswith("{\\rtf1")

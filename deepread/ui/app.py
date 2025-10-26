@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 import streamlit as st
 
 from deepread.cli.commands import SUPPORTED_FORMATS
@@ -17,7 +17,9 @@ st.title("Document OCR Insight Pipeline")
 
 @st.cache_resource
 def _pipeline() -> ProcessingPipeline:
-    workspace_root = Path(os.environ.get("DEEPREAD_STORE", ".deepread-store")) / "streamlit"
+    workspace_root = (
+        Path(os.environ.get("DEEPREAD_STORE", ".deepread-store")) / "streamlit"
+    )
     return ProcessingPipeline(workspace_root=workspace_root)
 
 
@@ -39,7 +41,9 @@ if st.button("Process Batch"):
     else:
         documents = [(file.read(), file.name) for file in uploaded_files]
         pipeline = _pipeline()
-        result = pipeline.process_batch(documents=documents, requested_formats=set(selected_formats))
+        result = pipeline.process_batch(
+            documents=documents, requested_formats=set(selected_formats)
+        )
 
         st.success(f"Job {result.job_id} completed with status: {result.status}")
 

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
-import pytest
 
 from deepread.ocr.deepseek import DeepSeekOcr, OcrOutput
 
@@ -12,8 +9,12 @@ class FakeEngine:
         self._responses = responses
         self.invocations: list[dict[str, object]] = []
 
-    def __call__(self, *, prompt: str, image_bytes: bytes, max_tokens: int) -> tuple[str, float]:
-        self.invocations.append({"prompt": prompt, "image_bytes": image_bytes, "max_tokens": max_tokens})
+    def __call__(
+        self, *, prompt: str, image_bytes: bytes, max_tokens: int
+    ) -> tuple[str, float]:
+        self.invocations.append(
+            {"prompt": prompt, "image_bytes": image_bytes, "max_tokens": max_tokens}
+        )
         if not self._responses:
             raise RuntimeError("No more responses configured")
         return self._responses.pop(0)
@@ -65,4 +66,6 @@ def test_ocr_records_warning_when_retries_exhausted() -> None:
 
     assert output.text == "still blurry"
     assert output.confidence == 0.35
-    assert output.warnings == ["OCR confidence below threshold after retries (score=0.35)."]
+    assert output.warnings == [
+        "OCR confidence below threshold after retries (score=0.35)."
+    ]

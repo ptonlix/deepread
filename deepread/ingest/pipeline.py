@@ -17,12 +17,18 @@ from uuid import UUID, uuid4
 
 from deepread.insights.models import InsightReport
 from deepread.insights.summarizer import InsightSummarizer, PageInsight
-from deepread.insights.templates import render_json, render_manifest, render_markdown, render_rich_text
+from deepread.insights.templates import (
+    render_json,
+    render_manifest,
+    render_markdown,
+    render_rich_text,
+)
 from deepread.ocr.deepseek import DeepSeekOcr
-from deepread.render.image_renderer import DPI, render_text_page
-
-from .converters import PageContent, convert_document
+from .converters import PageImage, convert_document
 from .workspace import JobWorkspace
+
+# DPI constant for image consistency
+DPI = (300, 300)
 
 Processor = Callable[[bytes, str], Awaitable["ProcessorResult | None"]]
 
@@ -151,7 +157,9 @@ class _EchoEngine:
         self._text = text
         self._confidence = confidence
 
-    def __call__(self, *, prompt: str, image_bytes: bytes, max_tokens: int) -> tuple[str, float]:
+    def __call__(
+        self, *, prompt: str, image_bytes: bytes, max_tokens: int
+    ) -> tuple[str, float]:
         _ = (prompt, image_bytes, max_tokens)
         return self._text, self._confidence
 
@@ -169,7 +177,9 @@ class ProcessingPipeline:
         self._workspace_root = Path(workspace_root)
         self._workspace_root.mkdir(parents=True, exist_ok=True)
         self._summarizer = summarizer or InsightSummarizer()
-        self._ocr_factory = ocr_factory or (lambda text: DeepSeekOcr(engine=_EchoEngine(text)))
+        self._ocr_factory = ocr_factory or (
+            lambda text: DeepSeekOcr(engine=_EchoEngine(text))
+        )
 
     def process_document(
         self,
@@ -184,15 +194,21 @@ class ProcessingPipeline:
         job_id = job_id or uuid4().hex
         submission_uuid = submission_id or uuid4()
         submission_label = submission_uuid.hex[:8]
-        workspace = workspace or JobWorkspace(root=self._workspace_root, job_id=f"{job_id}-{submission_label}")
+        workspace = workspace or JobWorkspace(
+            root=self._workspace_root, job_id=f"{job_id}-{submission_label}"
+        )
         workspace.create()
 
         try:
-            page_contents = convert_document(document, filename)
-            page_insights = self._run_render_and_ocr(workspace, page_contents)
-            report = self._summarizer.summarize(submission_id=submission_uuid, page_insights=page_insights)
+            page_images = convert_document(document, filename)
+            page_insights = self._run_render_and_ocr(workspace, page_images)
+            report = self._summarizer.summarize(
+                submission_id=submission_uuid, page_insights=page_insights
+            )
             outputs = self._persist_outputs(workspace, report, requested_formats)
-            report_with_outputs = report.model_copy(update={"generated_formats": outputs})
+            report_with_outputs = report.model_copy(
+                update={"generated_formats": outputs}
+            )
             return SubmissionResult(
                 job_id=job_id,
                 submission_id=str(submission_uuid),
@@ -213,7 +229,9 @@ class ProcessingPipeline:
                 remediation=remediation,
             )
 
-    def create_job_manager(self, *, max_workers: int, default_formats: set[str] | None = None) -> JobManager:
+    def create_job_manager(
+        self, *, max_workers: int, default_formats: set[str] | None = None
+    ) -> JobManager:
         formats = default_formats or {"markdown"}
 
         async def processor(document: bytes, filename: str) -> ProcessorResult:
@@ -244,7 +262,9 @@ class ProcessingPipeline:
         submissions: list[SubmissionResult] = []
         for payload, filename in documents:
             submission_uuid = uuid4()
-            submission_workspace = JobWorkspace(root=batch_workspace.base_dir, job_id=submission_uuid.hex[:8])
+            submission_workspace = JobWorkspace(
+                root=batch_workspace.base_dir, job_id=submission_uuid.hex[:8]
+            )
             submission_workspace.create()
             result = self.process_document(
                 document=payload,
@@ -283,26 +303,25 @@ class ProcessingPipeline:
         )
 
     def _run_render_and_ocr(
-        self, workspace: JobWorkspace, page_contents: Iterable[PageContent]
+        self, workspace: JobWorkspace, page_images: Iterable[PageImage]
     ) -> list[PageInsight]:
         from io import BytesIO
 
         page_insights: list[PageInsight] = []
-        for content in page_contents:
-            renderer_output = render_text_page(content.text)
+        for page in page_images:
             buffer = BytesIO()
-            renderer_output.save(buffer, format="PNG", dpi=DPI)
+            page.image.save(buffer, format="PNG", dpi=DPI)
             buffer.seek(0)
 
-            image_path = workspace.images_dir / f"page-{content.index + 1:04d}.png"
+            image_path = workspace.images_dir / f"page-{page.index + 1:04d}.png"
             image_path.parent.mkdir(parents=True, exist_ok=True)
             image_path.write_bytes(buffer.getvalue())
 
-            ocr = self._ocr_factory(content.text)
+            ocr = self._ocr_factory(page.text_hint)
             ocr_output = ocr.run(image_bytes=buffer.getvalue())
             page_insights.append(
                 PageInsight(
-                    page_index=content.index,
+                    page_index=page.index,
                     text=ocr_output.text,
                     confidence=ocr_output.confidence,
                 )

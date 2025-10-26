@@ -8,6 +8,7 @@ surfaces (CLI, API, Streamlit).
 from __future__ import annotations
 
 from dataclasses import dataclass
+import datetime
 from statistics import mean
 from typing import Iterable
 from uuid import UUID
@@ -31,7 +32,9 @@ class PageInsight:
 class InsightSummarizer:
     """Aggregate page insights into an InsightReport."""
 
-    def summarize(self, *, submission_id: UUID, page_insights: Iterable[PageInsight]) -> InsightReport:
+    def summarize(
+        self, *, submission_id: UUID, page_insights: Iterable[PageInsight]
+    ) -> InsightReport:
         insights = list(page_insights)
         if not insights:
             raise ValueError("At least one page insight is required.")
@@ -97,7 +100,7 @@ class InsightSummarizer:
         return warnings
 
     @staticmethod
-    def _current_timestamp():
+    def _current_timestamp() -> datetime.datetime:
         from datetime import UTC, datetime
 
         return datetime.now(UTC)

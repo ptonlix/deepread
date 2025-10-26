@@ -30,7 +30,9 @@ def test_insight_report_accepts_valid_payload() -> None:
         summary="Concise overview",
         key_findings=[_build_finding()],
         action_suggestions=[
-            ActionSuggestion(instruction="Follow up with client", rationale="Outstanding questions.")
+            ActionSuggestion(
+                instruction="Follow up with client", rationale="Outstanding questions."
+            )
         ],
         open_questions=["Need clarification on budget assumption?"],
         generated_formats={"markdown": "reports/doc.md", "json": "reports/doc.json"},
@@ -57,7 +59,9 @@ def test_report_requires_supported_formats() -> None:
             submission_id=uuid4(),
             summary="Summary",
             key_findings=[_build_finding()],
-            action_suggestions=[ActionSuggestion(instruction="Act", rationale="Reason")],
+            action_suggestions=[
+                ActionSuggestion(instruction="Act", rationale="Reason")
+            ],
             generated_formats={"pdf": "reports/legacy.pdf"},
             generated_at=datetime.now(timezone.utc),
         )

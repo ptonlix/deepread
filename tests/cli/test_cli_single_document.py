@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -10,7 +9,9 @@ from deepread.cli.commands import main
 
 def _create_markdown_doc(tmp_path: Path) -> Path:
     doc_path = tmp_path / "sample.md"
-    doc_path.write_text("# Sample\n\nThis is a sample insight document.", encoding="utf-8")
+    doc_path.write_text(
+        "# Sample\n\nThis is a sample insight document.", encoding="utf-8"
+    )
     return doc_path
 
 

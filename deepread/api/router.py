@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Any
+from typing import Any
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response
@@ -32,7 +32,10 @@ class _JobRepository:
             "jobId": result.job_id,
             "status": result.status,
             "manifestPath": result.manifest_path,
-            "submissions": [self._serialize_submission(submission) for submission in result.submissions],
+            "submissions": [
+                self._serialize_submission(submission)
+                for submission in result.submissions
+            ],
         }
 
     @staticmethod
@@ -63,7 +66,9 @@ def create_app(*, workspace_root: Path | str | None = None) -> FastAPI:
         requestedOutputs: list[str] | None = Form(default=None),
     ) -> JSONResponse:  # noqa: N803 (FastAPI naming convention)
         if not documents:
-            raise HTTPException(status_code=400, detail="At least one document must be uploaded")
+            raise HTTPException(
+                status_code=400, detail="At least one document must be uploaded"
+            )
 
         payloads: list[tuple[bytes, str]] = []
         for item in documents:
@@ -71,7 +76,9 @@ def create_app(*, workspace_root: Path | str | None = None) -> FastAPI:
             payloads.append((await item.read(), name))
 
         formats = {entry.lower() for entry in requestedOutputs or []} or {"markdown"}
-        batch_result = pipeline.process_batch(documents=payloads, requested_formats=formats)
+        batch_result = pipeline.process_batch(
+            documents=payloads, requested_formats=formats
+        )
         repository.save(batch_result)
 
         return JSONResponse(repository.as_status_payload(batch_result), status_code=202)
@@ -81,21 +88,30 @@ def create_app(*, workspace_root: Path | str | None = None) -> FastAPI:
         try:
             result = repository.get_job(job_id)
         except KeyError as exc:  # pragma: no cover
-            raise HTTPException(status_code=404, detail=f"Job {job_id} not found") from exc
+            raise HTTPException(
+                status_code=404, detail=f"Job {job_id} not found"
+            ) from exc
         return JSONResponse(repository.as_status_payload(result))
 
     @router.get("/v1/reports/{submission_id}/content")
     async def report_content(submission_id: str, format: str = Query(...)) -> Response:
         if submission_id not in repository.submissions:
-            raise HTTPException(status_code=404, detail=f"Submission {submission_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Submission {submission_id} not found"
+            )
 
         submission = repository.submissions[submission_id]
         if format not in submission.outputs:
-            raise HTTPException(status_code=400, detail=f"Format '{format}' not available for submission {submission_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Format '{format}' not available for submission {submission_id}",
+            )
 
         path = Path(submission.outputs[format])
         if not path.exists():
-            raise HTTPException(status_code=500, detail="Report content unavailable on disk")
+            raise HTTPException(
+                status_code=500, detail="Report content unavailable on disk"
+            )
 
         media_types = {
             "markdown": "text/markdown",

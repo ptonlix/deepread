@@ -14,9 +14,8 @@ import json
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
-from deepread.ingest.pipeline import ProcessingPipeline, SubmissionResult
+from deepread.ingest.pipeline import ProcessingPipeline
 
 DEFAULT_FORMATS = {"markdown"}
 SUPPORTED_FORMATS = {"markdown", "json", "rich_text"}
@@ -52,7 +51,9 @@ class JobMetadata:
     @staticmethod
     def from_json(payload: str) -> "JobMetadata":
         data = json.loads(payload)
-        submissions = [SubmissionMetadata(**item) for item in data.get("submissions", [])]
+        submissions = [
+            SubmissionMetadata(**item) for item in data.get("submissions", [])
+        ]
         return JobMetadata(
             job_id=data["job_id"],
             status=data["status"],
@@ -94,10 +95,14 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Job {batch.job_id}")
     elif args.command == "status":
         metadata = _load_metadata(store, args.job_id)
-        display_status = "completed" if metadata.status == "complete" else metadata.status
+        display_status = (
+            "completed" if metadata.status == "complete" else metadata.status
+        )
         print(f"Job {metadata.job_id} status: {display_status}")
         for submission in metadata.submissions:
-            remediation = f" ({submission.remediation})" if submission.remediation else ""
+            remediation = (
+                f" ({submission.remediation})" if submission.remediation else ""
+            )
             print(f"- {submission.filename}: {submission.status}{remediation}")
     elif args.command == "fetch":
         metadata = _load_metadata(store, args.job_id)
@@ -105,7 +110,9 @@ def main(argv: list[str] | None = None) -> None:
         _ensure_supported_formats({format_name})
         submission = _select_submission(metadata, args.submission_id)
         if format_name not in submission.outputs:
-            raise SystemExit(f"Format '{format_name}' not available for job {args.job_id}")
+            raise SystemExit(
+                f"Format '{format_name}' not available for job {args.job_id}"
+            )
         content = Path(submission.outputs[format_name]).read_text(encoding="utf-8")
         print(content)
     elif args.command == "manifest":
@@ -117,11 +124,17 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="deepread-cli", description="Document OCR insight pipeline CLI")
+    parser = argparse.ArgumentParser(
+        prog="deepread-cli", description="Document OCR insight pipeline CLI"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    submit = subparsers.add_parser("submit", help="Submit a document for insight generation")
-    submit.add_argument("paths", nargs="+", help="One or more document paths to process")
+    submit = subparsers.add_parser(
+        "submit", help="Submit a document for insight generation"
+    )
+    submit.add_argument(
+        "paths", nargs="+", help="One or more document paths to process"
+    )
     submit.add_argument(
         "--output-format",
         action="append",
@@ -134,8 +147,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     fetch = subparsers.add_parser("fetch", help="Retrieve generated output for a job")
     fetch.add_argument("job_id", help="Identifier returned from the submit command")
-    fetch.add_argument("--format", required=True, choices=sorted(SUPPORTED_FORMATS), help="Output format to read")
-    fetch.add_argument("--submission-id", help="Submission identifier when multiple inputs were processed")
+    fetch.add_argument(
+        "--format",
+        required=True,
+        choices=sorted(SUPPORTED_FORMATS),
+        help="Output format to read",
+    )
+    fetch.add_argument(
+        "--submission-id",
+        help="Submission identifier when multiple inputs were processed",
+    )
 
     manifest = subparsers.add_parser("manifest", help="Show the manifest for a job")
     manifest.add_argument("job_id", help="Identifier returned from the submit command")
@@ -165,15 +186,23 @@ def _load_metadata(store: Path, job_id: str) -> JobMetadata:
 def _ensure_supported_formats(formats: set[str]) -> None:
     unsupported = formats - SUPPORTED_FORMATS
     if unsupported:
-        raise SystemExit(f"Unsupported output formats requested: {', '.join(sorted(unsupported))}")
+        raise SystemExit(
+            f"Unsupported output formats requested: {', '.join(sorted(unsupported))}"
+        )
 
 
-def _select_submission(metadata: JobMetadata, submission_id: str | None) -> SubmissionMetadata:
+def _select_submission(
+    metadata: JobMetadata, submission_id: str | None
+) -> SubmissionMetadata:
     if submission_id:
         for submission in metadata.submissions:
             if submission.submission_id == submission_id:
                 return submission
-        raise SystemExit(f"Submission {submission_id} not found for job {metadata.job_id}")
+        raise SystemExit(
+            f"Submission {submission_id} not found for job {metadata.job_id}"
+        )
     if len(metadata.submissions) == 1:
         return metadata.submissions[0]
-    raise SystemExit("Multiple submissions present; specify --submission-id to fetch output")
+    raise SystemExit(
+        "Multiple submissions present; specify --submission-id to fetch output"
+    )
