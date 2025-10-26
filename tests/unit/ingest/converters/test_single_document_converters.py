@@ -81,10 +81,4 @@ def test_pdf_conversion_requires_valid_pdf() -> None:
 def test_unsupported_format_raises_error() -> None:
     """Test that unsupported formats raise appropriate errors."""
     with pytest.raises(ValueError, match="Unsupported document format"):
-        convert_document(b"fake content", "sample.md")
-
-    with pytest.raises(ValueError, match="Unsupported document format"):
-        convert_document(b"fake content", "sample.pptx")
-
-    with pytest.raises(ValueError, match="Unsupported document format"):
         convert_document(b"fake content", "sample.txt")

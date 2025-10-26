@@ -7,11 +7,11 @@ from deepread.ingest.pipeline import ProcessingPipeline
 
 def test_processing_pipeline_generates_markdown(tmp_path: Path) -> None:
     pipeline = ProcessingPipeline(workspace_root=tmp_path)
-    document = b"# Heading\n\nThis is the body of the document."
+    document = b"<html><body><h1>Heading</h1><p>This is the body of the document.</p></body></html>"
 
     result = pipeline.process_document(
         document=document,
-        filename="input.md",
+        filename="input.html",
         requested_formats={"markdown"},
     )
 

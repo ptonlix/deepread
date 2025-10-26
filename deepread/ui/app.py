@@ -25,7 +25,7 @@ def _pipeline() -> ProcessingPipeline:
 
 uploaded_files = st.file_uploader(
     "Upload documents",
-    type=list(SUPPORTED_FORMATS) + ["pdf", "docx", "pptx", "xlsx", "html", "htm", "md"],
+    type=list(SUPPORTED_FORMATS) + ["pdf", "docx", "xlsx", "html", "htm"],
     accept_multiple_files=True,
 )
 

@@ -7,10 +7,11 @@ from pathlib import Path
 from deepread.cli.commands import main
 
 
-def _create_markdown_doc(tmp_path: Path) -> Path:
-    doc_path = tmp_path / "sample.md"
+def _create_html_doc(tmp_path: Path) -> Path:
+    doc_path = tmp_path / "sample.html"
     doc_path.write_text(
-        "# Sample\n\nThis is a sample insight document.", encoding="utf-8"
+        "<html><body><h1>Sample</h1><p>This is a sample insight document.</p></body></html>",
+        encoding="utf-8",
     )
     return doc_path
 
@@ -19,11 +20,11 @@ def test_cli_submit_status_fetch(tmp_path: Path, monkeypatch) -> None:
     store_dir = tmp_path / "store"
     monkeypatch.setenv("DEEPREAD_STORE", str(store_dir))
 
-    doc_path = _create_markdown_doc(tmp_path)
+    doc_path = _create_html_doc(tmp_path)
 
     stdout = StringIO()
     with redirect_stdout(stdout):
-        main(["submit", str(doc_path), "--output-format", "markdown"])
+        main(["submit", str(doc_path), "--output-format", "mardown"])
     submit_output = stdout.getvalue().strip()
     assert "Job" in submit_output
     job_id = submit_output.split()[-1]

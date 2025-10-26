@@ -12,7 +12,7 @@ def test_fetch_structured_outputs(tmp_path: Path) -> None:
     client = TestClient(app)
 
     files = [
-        ("documents", ("doc.md", b"# Heading\n\nContent", "text/markdown")),
+        ("documents", ("doc.html", b"<h1>Heading</h1><p>Content</p>", "text/html")),
     ]
 
     response = client.post(

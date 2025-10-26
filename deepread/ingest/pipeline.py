@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import shorten
 from typing import Awaitable, Callable, Iterable
 from uuid import UUID, uuid4
 
@@ -29,6 +30,10 @@ from .workspace import JobWorkspace
 
 # DPI constant for image consistency
 DPI = (300, 300)
+FALLBACK_TEXT_MESSAGE = (
+    "Document conversion failed; generated summary from raw content."
+)
+FALLBACK_CONFIDENCE = 0.55
 
 Processor = Callable[[bytes, str], Awaitable["ProcessorResult | None"]]
 
@@ -199,9 +204,40 @@ class ProcessingPipeline:
         )
         workspace.create()
 
+        remediation: str | None = None
         try:
             page_images = convert_document(document, filename)
+        except ValueError as exc:
+            remediation = f"Processing failed: {exc}"
+            return SubmissionResult(
+                job_id=job_id,
+                submission_id=str(submission_uuid),
+                original_filename=filename,
+                status="failed",
+                outputs={},
+                report=None,
+                remediation=remediation,
+            )
+        except Exception as exc:
+            page_images = []
+            remediation = f"Conversion failed: {exc}"
+
+        if page_images:
             page_insights = self._run_render_and_ocr(workspace, page_images)
+        else:
+            page_insights = [
+                PageInsight(
+                    page_index=0,
+                    text=_extract_fallback_text(document),
+                    confidence=FALLBACK_CONFIDENCE,
+                )
+            ]
+            if remediation is None:
+                remediation = FALLBACK_TEXT_MESSAGE
+            else:
+                remediation = f"{FALLBACK_TEXT_MESSAGE} ({remediation})"
+
+        try:
             report = self._summarizer.summarize(
                 submission_id=submission_uuid, page_insights=page_insights
             )
@@ -216,9 +252,12 @@ class ProcessingPipeline:
                 status="complete",
                 outputs=outputs,
                 report=report_with_outputs,
+                remediation=remediation,
             )
         except Exception as exc:  # pragma: no cover - exercised via integration tests
-            remediation = f"Processing failed: {exc}"
+            remediation_message = (
+                remediation if remediation is not None else f"Processing failed: {exc}"
+            )
             return SubmissionResult(
                 job_id=job_id,
                 submission_id=str(submission_uuid),
@@ -226,7 +265,7 @@ class ProcessingPipeline:
                 status="failed",
                 outputs={},
                 report=None,
-                remediation=remediation,
+                remediation=remediation_message,
             )
 
     def create_job_manager(
@@ -355,3 +394,14 @@ class ProcessingPipeline:
             path.write_text(payload, encoding="utf-8")
             outputs["rich_text"] = str(path)
         return outputs
+
+
+def _extract_fallback_text(document: bytes) -> str:
+    """Derive a human-readable fallback snippet from raw document bytes."""
+    try:
+        decoded = document.decode("utf-8", errors="ignore")
+    except Exception:  # pragma: no cover - extremely defensive
+        decoded = ""
+    text = decoded.strip() or FALLBACK_TEXT_MESSAGE
+    # Limit length to keep summaries concise while preserving key context
+    return shorten(text, width=1200, placeholder="…")

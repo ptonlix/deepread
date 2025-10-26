@@ -10,6 +10,7 @@ Usage patterns:
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
 from dataclasses import asdict, dataclass
@@ -19,6 +20,7 @@ from deepread.ingest.pipeline import ProcessingPipeline
 
 DEFAULT_FORMATS = {"markdown"}
 SUPPORTED_FORMATS = {"markdown", "json", "rich_text"}
+FORMAT_ALIASES = {"md": "markdown", "rtf": "rich_text", "mardown": "markdown"}
 
 
 @dataclass(slots=True)
@@ -71,8 +73,10 @@ def main(argv: list[str] | None = None) -> None:
     pipeline = ProcessingPipeline(workspace_root=workspace_root)
 
     if args.command == "submit":
-        formats = {fmt.lower() for fmt in (args.output_format or [])} or DEFAULT_FORMATS
-        _ensure_supported_formats(formats)
+        requested = args.output_format or []
+        formats, advisories = _normalize_formats(requested)
+        for message in advisories:
+            print(message)
         document_paths = [Path(path) for path in args.paths]
         documents = [(path.read_bytes(), path.name) for path in document_paths]
         batch = pipeline.process_batch(documents=documents, requested_formats=formats)
@@ -138,7 +142,6 @@ def _build_parser() -> argparse.ArgumentParser:
     submit.add_argument(
         "--output-format",
         action="append",
-        choices=sorted(SUPPORTED_FORMATS),
         help="Output format to generate (can be provided multiple times)",
     )
 
@@ -189,6 +192,41 @@ def _ensure_supported_formats(formats: set[str]) -> None:
         raise SystemExit(
             f"Unsupported output formats requested: {', '.join(sorted(unsupported))}"
         )
+
+
+def _normalize_formats(
+    raw_formats: list[str],
+) -> tuple[set[str], list[str]]:
+    """Resolve user-provided format strings to supported values."""
+    normalized: set[str] = set()
+    advisories: list[str] = []
+    for entry in raw_formats:
+        candidate = entry.lower()
+        if candidate in SUPPORTED_FORMATS:
+            normalized.add(candidate)
+            continue
+        if candidate in FORMAT_ALIASES:
+            resolved = FORMAT_ALIASES[candidate]
+            normalized.add(resolved)
+            advisories.append(f"Interpreting output format '{entry}' as '{resolved}'.")
+            continue
+        suggestion = difflib.get_close_matches(
+            candidate, SUPPORTED_FORMATS, n=1, cutoff=0.7
+        )
+        if suggestion:
+            resolved = suggestion[0]
+            normalized.add(resolved)
+            advisories.append(f"Interpreting output format '{entry}' as '{resolved}'.")
+            continue
+        advisories.append(f"Ignoring unsupported output format '{entry}'.")
+
+    if not normalized:
+        normalized = set(DEFAULT_FORMATS)
+        if raw_formats:
+            advisories.append(
+                f"No valid output formats supplied. Using default: {', '.join(sorted(DEFAULT_FORMATS))}."
+            )
+    return normalized, advisories
 
 
 def _select_submission(

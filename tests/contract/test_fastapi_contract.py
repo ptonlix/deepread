@@ -12,7 +12,7 @@ def test_create_job_and_fetch_status(tmp_path: Path) -> None:
     client = TestClient(app)
 
     files = [
-        ("documents", ("doc1.md", b"# Title\n\nContent", "text/markdown")),
+        ("documents", ("doc1.html", b"<h1>Title</h1><p>Content</p>", "text/html")),
         ("documents", ("doc2.html", b"<h1>Title</h1><p>Paragraph</p>", "text/html")),
     ]
 

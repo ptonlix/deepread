@@ -12,8 +12,10 @@ def test_cli_fetch_json_and_rich_text(tmp_path: Path, monkeypatch) -> None:
     store = tmp_path / "store"
     monkeypatch.setenv("DEEPREAD_STORE", str(store))
 
-    doc = tmp_path / "doc.md"
-    doc.write_text("# Title\n\nBody text", encoding="utf-8")
+    doc = tmp_path / "doc.html"
+    doc.write_text(
+        "<html><body><h1>Title</h1><p>Body text</p></body></html>", encoding="utf-8"
+    )
 
     stdout = StringIO()
     with redirect_stdout(stdout):

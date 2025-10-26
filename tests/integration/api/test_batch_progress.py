@@ -12,7 +12,10 @@ def test_batch_progress_records_failures(tmp_path: Path) -> None:
     client = TestClient(app)
 
     files = [
-        ("documents", ("supported.md", b"# Heading\n\nContent", "text/markdown")),
+        (
+            "documents",
+            ("supported.html", b"<h1>Heading</h1><p>Content</p>", "text/html"),
+        ),
         ("documents", ("unsupported.txt", b"plain text", "text/plain")),
     ]
 
