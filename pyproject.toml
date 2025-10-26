@@ -18,6 +18,7 @@ dependencies = [
     "pandas>=2.2.2",
     "docx2pdf>=0.1.8",
     "imgkit>=1.2.3",
+    "uvicorn>=0.38.0",
 ]
 
 [dependency-groups]

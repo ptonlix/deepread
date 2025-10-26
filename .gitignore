@@ -171,6 +171,11 @@ cython_debug/
 
 .specify
 .codex
+.trae
 specs
 
 /tmp
+
+
+.deepread-store
+.deepread-api
