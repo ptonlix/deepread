@@ -296,13 +296,14 @@ class ProcessingPipeline:
 
         job_id = uuid4().hex
         batch_workspace = JobWorkspace(root=self._workspace_root, job_id=job_id)
-        batch_workspace.create()
+        batch_workspace.create(subdirectories=("outputs", "submissions"))
+        submissions_root = batch_workspace.base_dir / "submissions"
 
         submissions: list[SubmissionResult] = []
         for payload, filename in documents:
             submission_uuid = uuid4()
             submission_workspace = JobWorkspace(
-                root=batch_workspace.base_dir, job_id=submission_uuid.hex[:8]
+                root=submissions_root, job_id=submission_uuid.hex[:8]
             )
             submission_workspace.create()
             result = self.process_document(

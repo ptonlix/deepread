@@ -25,6 +25,18 @@ def test_workspace_creates_expected_structure(tmp_path: Path) -> None:
     assert metadata["created_at"]  # ISO timestamp
 
 
+def test_workspace_create_custom_subdirectories(tmp_path: Path) -> None:
+    job_workspace = workspace.JobWorkspace(root=tmp_path, job_id="job-custom")
+
+    job_workspace.create(subdirectories=("outputs", "submissions"))
+
+    assert job_workspace.base_dir.exists()
+    assert job_workspace.outputs_dir.exists()
+    assert (job_workspace.base_dir / "submissions").exists()
+    assert not job_workspace.images_dir.exists()
+    assert not job_workspace.ocr_dir.exists()
+
+
 def test_workspace_cleanup_removes_contents(tmp_path: Path) -> None:
     job_workspace = workspace.JobWorkspace(root=tmp_path, job_id="job-456")
     job_workspace.create()

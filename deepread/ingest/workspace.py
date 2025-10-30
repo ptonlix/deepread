@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -52,10 +53,17 @@ class JobWorkspace:
         return self.base_dir / METADATA_FILENAME
 
     # --- Lifecycle -------------------------------------------------------- #
-    def create(self) -> None:
+    def create(self, *, subdirectories: Iterable[str] | None = None) -> None:
         """Create the workspace directory structure and metadata."""
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        for directory in (self.images_dir, self.ocr_dir, self.outputs_dir):
+        if subdirectories is None:
+            directories = ("images", "ocr", "outputs")
+        elif isinstance(subdirectories, str):
+            directories = (subdirectories,)
+        else:
+            directories = tuple(subdirectories)
+        for name in directories:
+            directory = self.base_dir / name
             directory.mkdir(parents=True, exist_ok=True)
 
         metadata = {
