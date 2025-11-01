@@ -84,6 +84,7 @@ class TestVLLMEngines:
     """Test vLLM engine creation and inference."""
 
     @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
+    @patch("deepread.ocr.deepseek.NGramPerReqLogitsProcessor", Mock())
     def test_create_vllm_engine_local(self):
         """Test creating local vLLM engine."""
         engine = create_vllm_engine(mode="local", model_name="test-model")
@@ -117,33 +118,20 @@ class TestVLLMEngines:
             VLLMLocalEngine()
 
     @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
-    @patch("deepread.ocr.deepseek.DEEPSEEK_OCR_MODEL_AVAILABLE", False)
+    @patch("deepread.ocr.deepseek.NGramPerReqLogitsProcessor", Mock())
     def test_vllm_local_engine_inference(self):
         """Test VLLMLocalEngine inference call."""
-        with patch("deepread.ocr.deepseek.LLM", create=True) as mock_llm_class, patch(
-            "deepread.ocr.deepseek.Image", create=True
-        ) as mock_image_class, patch(
-            "deepread.ocr.deepseek.AutoTokenizer", create=True
-        ) as mock_tokenizer_class, patch(
-            "deepread.ocr.deepseek.DeepseekOCRProcessor", create=True
-        ) as mock_processor_class, patch(
-            "deepread.ocr.deepseek.ModelRegistry", create=True
+        # Create mock Image module
+        mock_image_module = Mock()
+        mock_image = Mock()
+        mock_image_module.open.return_value.convert.return_value = mock_image
+        
+        with patch("deepread.ocr.deepseek.LLM") as mock_llm_class, patch(
+            "deepread.ocr.deepseek.Image", mock_image_module, create=True
         ):
             # Setup mocks
             mock_llm = Mock()
             mock_llm_class.return_value = mock_llm
-
-            mock_image = Mock()
-            mock_image_class.open.return_value.convert.return_value = mock_image
-
-            mock_tokenizer = Mock()
-            mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
-
-            mock_processor = Mock()
-            mock_processor.tokenize_with_images.return_value = [
-                [Mock(), Mock(), Mock(), Mock(), Mock(), [], []]
-            ]
-            mock_processor_class.return_value = mock_processor
 
             mock_output = Mock()
             mock_output.outputs = [Mock()]
@@ -159,32 +147,21 @@ class TestVLLMEngines:
             assert result_text == "extracted text"
             assert 0.0 <= confidence <= 1.0
             mock_llm.generate.assert_called_once()
-            mock_processor.tokenize_with_images.assert_called_once()
 
     @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
-    @patch("deepread.ocr.deepseek.DEEPSEEK_OCR_MODEL_AVAILABLE", False)
+    @patch("deepread.ocr.deepseek.NGramPerReqLogitsProcessor", Mock())
     def test_vllm_local_engine_inference_error(self):
         """Test VLLMLocalEngine error handling during inference."""
-        with patch("deepread.ocr.deepseek.LLM", create=True) as mock_llm_class, patch(
-            "deepread.ocr.deepseek.AutoTokenizer", create=True
-        ) as mock_tokenizer_class, patch(
-            "deepread.ocr.deepseek.DeepseekOCRProcessor", create=True
-        ) as mock_processor_class, patch(
-            "deepread.ocr.deepseek.ModelRegistry", create=True
-        ), patch("deepread.ocr.deepseek.Image", create=True):
+        # Create mock Image module
+        mock_image_module = Mock()
+        
+        with patch("deepread.ocr.deepseek.LLM") as mock_llm_class, patch(
+            "deepread.ocr.deepseek.Image", mock_image_module, create=True
+        ):
             # Setup mocks
             mock_llm = Mock()
             mock_llm_class.return_value = mock_llm
             mock_llm.generate.side_effect = Exception("Inference failed")
-
-            mock_tokenizer = Mock()
-            mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
-
-            mock_processor = Mock()
-            mock_processor.tokenize_with_images.return_value = [
-                [Mock(), Mock(), Mock(), Mock(), Mock(), [], []]
-            ]
-            mock_processor_class.return_value = mock_processor
 
             # Test error handling
             engine = VLLMLocalEngine()

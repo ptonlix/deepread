@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import pytest
-
 from deepread.config import DeepReadConfig, OCRConfig, get_config, set_config
 
 
@@ -15,7 +13,7 @@ def test_ocr_config_defaults() -> None:
     config = OCRConfig()
 
     assert config.mode == "fallback"
-    assert config.model_path == "deepseek-ai/deepseek-text-ocr"
+    assert config.model_path == "deepseek-ai/DeepSeek-OCR"
     assert config.tensor_parallel_size == 1
     assert config.gpu_memory_utilization == 0.8
     assert config.max_model_len == 4096
@@ -77,12 +75,15 @@ def test_ocr_config_to_vllm_local() -> None:
     vllm_config = config.to_vllm_config()
 
     expected = {
-        "model": "test/model",
+        "model_name": "test/model",
         "tensor_parallel_size": 2,
         "gpu_memory_utilization": 0.9,
         "max_model_len": 8192,
         "max_tokens": 4096,
         "temperature": 0.1,
+        "ngram_size": 30,
+        "window_size": 90,
+        "whitelist_token_ids": (128821, 128822),
     }
     assert vllm_config == expected
 
