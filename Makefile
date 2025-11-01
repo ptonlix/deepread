@@ -46,10 +46,10 @@ build-and-publish: build publish ## Build and publish.
 .PHONY: githooks
 githooks:
 	:
-	: 🚀 Installing pre-push hook
+	: 🚀 Installing pre-commit hook
 	:
-	echo 'make check test' > .git/hooks/pre-push
-	chmod +x .git/hooks/pre-push
+	echo 'make check test' > .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
 
 .PHONY: help
 help:
