@@ -15,55 +15,66 @@ from typing import Any
 @dataclass
 class OCRConfig:
     """Configuration for OCR inference engines."""
-    
+
     # OCR mode: "fallback", "vllm_local", "vllm_remote"
     mode: str = "fallback"
-    
+
     # vLLM local configuration
     model_path: str = "deepseek-ai/DeepSeek-OCR"
     tensor_parallel_size: int = 1
     gpu_memory_utilization: float = 0.8
     max_model_len: int = 4096
-    
+
     # vLLM remote configuration
     api_url: str = "http://localhost:8000/v1"
     api_key: str | None = None
     timeout: int = 30
-    
+
     # OCR processing parameters
     max_tokens: int = 2048
     temperature: float = 0.0
     confidence_threshold: float = 0.7
     max_retries: int = 3
-    
+
     # DeepSeek-OCR specific parameters (using vLLM built-in support)
     ngram_size: int = 30
     window_size: int = 90
     whitelist_token_ids: tuple[int, ...] = (128821, 128822)  # <td>, </td>
-    
+
     @classmethod
     def from_env(cls) -> OCRConfig:
         """Create OCR configuration from environment variables."""
         return cls(
             mode=os.environ.get("DEEPREAD_OCR_MODE", "fallback"),
-            model_path=os.environ.get("DEEPREAD_OCR_MODEL_PATH", "deepseek-ai/DeepSeek-OCR"),
-            tensor_parallel_size=int(os.environ.get("DEEPREAD_OCR_TENSOR_PARALLEL_SIZE", "1")),
-            gpu_memory_utilization=float(os.environ.get("DEEPREAD_OCR_GPU_MEMORY_UTILIZATION", "0.8")),
+            model_path=os.environ.get(
+                "DEEPREAD_OCR_MODEL_PATH", "deepseek-ai/DeepSeek-OCR"
+            ),
+            tensor_parallel_size=int(
+                os.environ.get("DEEPREAD_OCR_TENSOR_PARALLEL_SIZE", "1")
+            ),
+            gpu_memory_utilization=float(
+                os.environ.get("DEEPREAD_OCR_GPU_MEMORY_UTILIZATION", "0.8")
+            ),
             max_model_len=int(os.environ.get("DEEPREAD_OCR_MAX_MODEL_LEN", "4096")),
             api_url=os.environ.get("DEEPREAD_OCR_API_URL", "http://localhost:8000/v1"),
             api_key=os.environ.get("DEEPREAD_OCR_API_KEY"),
             timeout=int(os.environ.get("DEEPREAD_OCR_TIMEOUT", "30")),
             max_tokens=int(os.environ.get("DEEPREAD_OCR_MAX_TOKENS", "2048")),
             temperature=float(os.environ.get("DEEPREAD_OCR_TEMPERATURE", "0.0")),
-            confidence_threshold=float(os.environ.get("DEEPREAD_OCR_CONFIDENCE_THRESHOLD", "0.7")),
+            confidence_threshold=float(
+                os.environ.get("DEEPREAD_OCR_CONFIDENCE_THRESHOLD", "0.7")
+            ),
             max_retries=int(os.environ.get("DEEPREAD_OCR_MAX_RETRIES", "3")),
             ngram_size=int(os.environ.get("DEEPREAD_OCR_NGRAM_SIZE", "30")),
             window_size=int(os.environ.get("DEEPREAD_OCR_WINDOW_SIZE", "90")),
             whitelist_token_ids=tuple(
-                int(x) for x in os.environ.get("DEEPREAD_OCR_WHITELIST_TOKEN_IDS", "128821,128822").split(",")
+                int(x)
+                for x in os.environ.get(
+                    "DEEPREAD_OCR_WHITELIST_TOKEN_IDS", "128821,128822"
+                ).split(",")
             ),
         )
-    
+
     def to_vllm_config(self) -> dict[str, Any]:
         """Convert to vLLM engine configuration."""
         if self.mode == "vllm_local":
@@ -93,17 +104,17 @@ class OCRConfig:
 @dataclass
 class DeepReadConfig:
     """Main configuration for deepread application."""
-    
+
     # Storage configuration
     store_root: str = ".deepread-store"
-    
+
     # OCR configuration
     ocr: OCRConfig = None  # type: ignore
-    
+
     def __post_init__(self) -> None:
         if self.ocr is None:
             self.ocr = OCRConfig()
-    
+
     @classmethod
     def from_env(cls) -> DeepReadConfig:
         """Create configuration from environment variables."""

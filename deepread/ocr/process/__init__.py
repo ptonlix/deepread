@@ -10,4 +10,3 @@ from deepread.ocr.process.ngram_norepeat import NoRepeatNGramLogitsProcessor
 from deepread.ocr.process.image_process import DeepseekOCRProcessor
 
 __all__ = ["NoRepeatNGramLogitsProcessor", "DeepseekOCRProcessor"]
-

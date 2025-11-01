@@ -13,7 +13,7 @@ from deepread.config import DeepReadConfig, OCRConfig, get_config, set_config
 def test_ocr_config_defaults() -> None:
     """Test OCR configuration default values."""
     config = OCRConfig()
-    
+
     assert config.mode == "fallback"
     assert config.model_path == "deepseek-ai/deepseek-text-ocr"
     assert config.tensor_parallel_size == 1
@@ -44,10 +44,10 @@ def test_ocr_config_from_env() -> None:
         "DEEPREAD_OCR_CONFIDENCE_THRESHOLD": "0.8",
         "DEEPREAD_OCR_MAX_RETRIES": "5",
     }
-    
+
     with patch.dict(os.environ, env_vars):
         config = OCRConfig.from_env()
-    
+
     assert config.mode == "vllm_local"
     assert config.model_path == "custom/model"
     assert config.tensor_parallel_size == 2
@@ -73,9 +73,9 @@ def test_ocr_config_to_vllm_local() -> None:
         max_tokens=4096,
         temperature=0.1,
     )
-    
+
     vllm_config = config.to_vllm_config()
-    
+
     expected = {
         "model": "test/model",
         "tensor_parallel_size": 2,
@@ -97,9 +97,9 @@ def test_ocr_config_to_vllm_remote() -> None:
         max_tokens=4096,
         temperature=0.1,
     )
-    
+
     vllm_config = config.to_vllm_config()
-    
+
     expected = {
         "api_url": "http://remote:8000/v1",
         "api_key": "test-key",
@@ -113,16 +113,16 @@ def test_ocr_config_to_vllm_remote() -> None:
 def test_ocr_config_to_vllm_fallback() -> None:
     """Test OCR config conversion for fallback mode."""
     config = OCRConfig(mode="fallback")
-    
+
     vllm_config = config.to_vllm_config()
-    
+
     assert vllm_config == {}
 
 
 def test_deepread_config_defaults() -> None:
     """Test DeepRead configuration default values."""
     config = DeepReadConfig()
-    
+
     assert config.store_root == ".deepread-store"
     assert isinstance(config.ocr, OCRConfig)
 
@@ -133,10 +133,10 @@ def test_deepread_config_from_env() -> None:
         "DEEPREAD_STORE": "/custom/store",
         "DEEPREAD_OCR_MODE": "vllm_local",
     }
-    
+
     with patch.dict(os.environ, env_vars):
         config = DeepReadConfig.from_env()
-    
+
     assert config.store_root == "/custom/store"
     assert config.ocr.mode == "vllm_local"
 
@@ -145,14 +145,14 @@ def test_global_config_singleton() -> None:
     """Test global configuration singleton behavior."""
     # Reset global config
     set_config(None)  # type: ignore
-    
+
     # First call should create config from environment
     with patch.dict(os.environ, {"DEEPREAD_OCR_MODE": "vllm_local"}):
         config1 = get_config()
-    
+
     # Second call should return same instance
     config2 = get_config()
-    
+
     assert config1 is config2
     assert config1.ocr.mode == "vllm_local"
 
@@ -163,10 +163,10 @@ def test_set_global_config() -> None:
         store_root="/custom",
         ocr=OCRConfig(mode="vllm_remote"),
     )
-    
+
     set_config(custom_config)
     retrieved_config = get_config()
-    
+
     assert retrieved_config is custom_config
     assert retrieved_config.store_root == "/custom"
     assert retrieved_config.ocr.mode == "vllm_remote"

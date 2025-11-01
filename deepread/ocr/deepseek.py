@@ -36,7 +36,8 @@ class InferenceEngine(Protocol):
 
     def __call__(
         self, *, prompt: str, image_bytes: bytes, max_tokens: int
-    ) -> tuple[str, float]: ...
+    ) -> tuple[str, float]:
+        ...
 
 
 @dataclass(slots=True)

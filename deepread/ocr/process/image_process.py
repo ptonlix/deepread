@@ -254,8 +254,8 @@ class DeepseekOCRProcessor(ProcessorMixin):
             List containing [input_ids, pixel_values, images_crop, images_seq_mask,
                            images_spatial_crop, num_image_tokens, image_shapes]
         """
-        assert prompt.count(self.image_token) == len(
-            images
+        assert (
+            prompt.count(self.image_token) == len(images)
         ), f"Number of <image> tokens ({prompt.count(self.image_token)}) must match number of images ({len(images)})"
 
         text_splits = prompt.split(self.image_token)
@@ -351,8 +351,8 @@ class DeepseekOCRProcessor(ProcessorMixin):
             tokenized_str = tokenized_str + [self.eos_id]
             images_seq_mask = images_seq_mask + [False]
 
-        assert len(tokenized_str) == len(
-            images_seq_mask
+        assert (
+            len(tokenized_str) == len(images_seq_mask)
         ), f"tokenized_str length {len(tokenized_str)} != images_seq_mask length {len(images_seq_mask)}"
 
         masked_tokenized_str = []
