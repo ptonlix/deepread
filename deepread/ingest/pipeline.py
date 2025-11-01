@@ -13,7 +13,7 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import shorten
-from typing import Awaitable, Callable, Iterable
+from typing import Any, Awaitable, Callable, Iterable
 from uuid import UUID, uuid4
 
 from deepread.insights.models import InsightReport
@@ -24,7 +24,8 @@ from deepread.insights.templates import (
     render_markdown,
     render_rich_text,
 )
-from deepread.ocr.deepseek import DeepSeekOcr
+from deepread.config import get_config
+from deepread.ocr.deepseek import DeepSeekOcr, create_vllm_engine
 from .converters import PageImage, convert_document
 from .workspace import JobWorkspace
 
@@ -178,13 +179,61 @@ class ProcessingPipeline:
         workspace_root: Path | str,
         summarizer: InsightSummarizer | None = None,
         ocr_factory: Callable[[str], DeepSeekOcr] | None = None,
+        ocr_mode: str | None = None,
+        ocr_config: dict | None = None,
     ) -> None:
         self._workspace_root = Path(workspace_root)
         self._workspace_root.mkdir(parents=True, exist_ok=True)
         self._summarizer = summarizer or InsightSummarizer()
-        self._ocr_factory = ocr_factory or (
-            lambda text: DeepSeekOcr(engine=_EchoEngine(text))
-        )
+
+        # Configure OCR based on mode
+        if ocr_factory is not None:
+            self._ocr_factory = ocr_factory
+        else:
+            config = get_config()
+            # Override config values if provided
+            if ocr_mode is not None:
+                config.ocr.mode = ocr_mode
+            if ocr_config is not None:
+                # Update config with provided values
+                for key, value in ocr_config.items():
+                    if hasattr(config.ocr, key):
+                        setattr(config.ocr, key, value)
+
+            self._ocr_factory = self._create_ocr_factory(config.ocr)
+
+    def _create_ocr_factory(self, ocr_config: Any) -> Callable[[str], DeepSeekOcr]:
+        """Create OCR factory based on configuration."""
+        if ocr_config.mode == "vllm_local":
+            try:
+                vllm_config = ocr_config.to_vllm_config()
+                engine = create_vllm_engine(mode="local", **vllm_config)
+                return lambda text: DeepSeekOcr(engine=engine)
+            except Exception as e:
+                # Fall back to echo engine if vLLM fails
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    f"Failed to initialize vLLM local engine: {e}. Falling back to echo engine."
+                )
+                return lambda text: DeepSeekOcr(engine=_EchoEngine(text))
+
+        elif ocr_config.mode == "vllm_remote":
+            try:
+                vllm_config = ocr_config.to_vllm_config()
+                engine = create_vllm_engine(mode="remote", **vllm_config)
+                return lambda text: DeepSeekOcr(engine=engine)
+            except Exception as e:
+                # Fall back to echo engine if remote vLLM fails
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    f"Failed to initialize vLLM remote engine: {e}. Falling back to echo engine."
+                )
+                return lambda text: DeepSeekOcr(engine=_EchoEngine(text))
+
+        else:  # fallback mode
+            return lambda text: DeepSeekOcr(engine=_EchoEngine(text))
 
     def process_document(
         self,

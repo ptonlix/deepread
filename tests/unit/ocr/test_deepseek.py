@@ -1,7 +1,16 @@
 from __future__ import annotations
 
+from unittest.mock import Mock, patch
 
-from deepread.ocr.deepseek import DeepSeekOcr, OcrOutput
+import pytest
+
+from deepread.ocr.deepseek import (
+    DeepSeekOcr,
+    OcrOutput,
+    VLLMLocalEngine,
+    VLLMRemoteEngine,
+    create_vllm_engine,
+)
 
 
 class FakeEngine:
@@ -69,3 +78,130 @@ def test_ocr_records_warning_when_retries_exhausted() -> None:
     assert output.warnings == [
         "OCR confidence below threshold after retries (score=0.35)."
     ]
+
+
+class TestVLLMEngines:
+    """Test vLLM engine creation and inference."""
+
+    @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
+    def test_create_vllm_engine_local(self):
+        """Test creating local vLLM engine."""
+        engine = create_vllm_engine(mode="local", model_name="test-model")
+        assert isinstance(engine, VLLMLocalEngine)
+        assert engine.model_name == "test-model"
+
+    @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
+    def test_create_vllm_engine_remote(self):
+        """Test creating remote vLLM engine."""
+        engine = create_vllm_engine(
+            mode="remote", base_url="http://localhost:8000", timeout=60.0
+        )
+        assert isinstance(engine, VLLMRemoteEngine)
+        assert engine.base_url == "http://localhost:8000"
+        assert engine.timeout == 60.0
+
+    def test_create_vllm_engine_invalid_mode(self):
+        """Test error handling for invalid mode."""
+        with pytest.raises(ValueError, match="Unsupported mode"):
+            create_vllm_engine(mode="invalid")
+
+    def test_create_vllm_engine_remote_missing_base_url(self):
+        """Test error handling when base_url is missing for remote mode."""
+        with pytest.raises(ValueError, match="base_url required"):
+            create_vllm_engine(mode="remote")
+
+    @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", False)
+    def test_vllm_local_engine_unavailable(self):
+        """Test VLLMLocalEngine when vLLM is not available."""
+        with pytest.raises(ImportError, match="vLLM dependencies not available"):
+            VLLMLocalEngine()
+
+    @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
+    @patch("deepread.ocr.deepseek.DEEPSEEK_OCR_MODEL_AVAILABLE", False)
+    def test_vllm_local_engine_inference(self):
+        """Test VLLMLocalEngine inference call."""
+        with patch("deepread.ocr.deepseek.LLM", create=True) as mock_llm_class, patch(
+            "deepread.ocr.deepseek.Image", create=True
+        ) as mock_image_class, patch(
+            "deepread.ocr.deepseek.AutoTokenizer", create=True
+        ) as mock_tokenizer_class, patch(
+            "deepread.ocr.deepseek.DeepseekOCRProcessor", create=True
+        ) as mock_processor_class, patch(
+            "deepread.ocr.deepseek.ModelRegistry", create=True
+        ):
+            # Setup mocks
+            mock_llm = Mock()
+            mock_llm_class.return_value = mock_llm
+
+            mock_image = Mock()
+            mock_image_class.open.return_value.convert.return_value = mock_image
+
+            mock_tokenizer = Mock()
+            mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+
+            mock_processor = Mock()
+            mock_processor.tokenize_with_images.return_value = [
+                [Mock(), Mock(), Mock(), Mock(), Mock(), [], []]
+            ]
+            mock_processor_class.return_value = mock_processor
+
+            mock_output = Mock()
+            mock_output.outputs = [Mock()]
+            mock_output.outputs[0].text = "extracted text"
+            mock_llm.generate.return_value = [mock_output]
+
+            # Test inference
+            engine = VLLMLocalEngine(model_name="test-model")
+            result_text, confidence = engine(
+                prompt="Extract text", image_bytes=b"fake_image", max_tokens=100
+            )
+
+            assert result_text == "extracted text"
+            assert 0.0 <= confidence <= 1.0
+            mock_llm.generate.assert_called_once()
+            mock_processor.tokenize_with_images.assert_called_once()
+
+    @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
+    @patch("deepread.ocr.deepseek.DEEPSEEK_OCR_MODEL_AVAILABLE", False)
+    def test_vllm_local_engine_inference_error(self):
+        """Test VLLMLocalEngine error handling during inference."""
+        with patch("deepread.ocr.deepseek.LLM", create=True) as mock_llm_class, patch(
+            "deepread.ocr.deepseek.AutoTokenizer", create=True
+        ) as mock_tokenizer_class, patch(
+            "deepread.ocr.deepseek.DeepseekOCRProcessor", create=True
+        ) as mock_processor_class, patch(
+            "deepread.ocr.deepseek.ModelRegistry", create=True
+        ), patch("deepread.ocr.deepseek.Image", create=True):
+            # Setup mocks
+            mock_llm = Mock()
+            mock_llm_class.return_value = mock_llm
+            mock_llm.generate.side_effect = Exception("Inference failed")
+
+            mock_tokenizer = Mock()
+            mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+
+            mock_processor = Mock()
+            mock_processor.tokenize_with_images.return_value = [
+                [Mock(), Mock(), Mock(), Mock(), Mock(), [], []]
+            ]
+            mock_processor_class.return_value = mock_processor
+
+            # Test error handling
+            engine = VLLMLocalEngine()
+            result_text, confidence = engine(
+                prompt="Extract text", image_bytes=b"fake_image", max_tokens=100
+            )
+
+            assert result_text == ""
+            assert confidence == 0.0
+
+    def test_vllm_remote_engine_inference(self):
+        """Test VLLMRemoteEngine inference call (placeholder implementation)."""
+        engine = VLLMRemoteEngine(base_url="http://localhost:8000")
+        result_text, confidence = engine(
+            prompt="Extract text", image_bytes=b"fake_image", max_tokens=100
+        )
+
+        # Current implementation returns empty results
+        assert result_text == ""
+        assert confidence == 0.0

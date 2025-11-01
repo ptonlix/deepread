@@ -19,7 +19,12 @@ dependencies = [
     "docx2pdf>=0.1.8",
     "imgkit>=1.2.3",
     "uvicorn>=0.38.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "transformers>=4.30.0",
+    "vllm>=0.11.0",
 ]
+
 
 [dependency-groups]
 dev = [
@@ -64,5 +69,5 @@ DEP003 = ["click"]
 DEP004 = ["pytest"]
 
 [[tool.mypy.overrides]]
-module = ["imgkit", "html2image", "docx2pdf"]
+module = ["imgkit", "html2image", "docx2pdf", "vllm", "ray", "torch", "torchvision", "transformers", "accelerate"]
 ignore_missing_imports = true

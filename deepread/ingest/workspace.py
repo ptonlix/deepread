@@ -57,7 +57,7 @@ class JobWorkspace:
         """Create the workspace directory structure and metadata."""
         self.base_dir.mkdir(parents=True, exist_ok=True)
         if subdirectories is None:
-            directories = ("images", "ocr", "outputs")
+            directories: tuple[str, ...] = ("images", "ocr", "outputs")
         elif isinstance(subdirectories, str):
             directories = (subdirectories,)
         else:
