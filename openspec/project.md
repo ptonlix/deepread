@@ -26,7 +26,7 @@ Deepread orchestrates a document OCR insight pipeline that ingests office files,
 ### Architecture Patterns
 
 - Pipeline-first design: `ProcessingPipeline` composes conversion, OCR, summarization, and output rendering steps while persisting artifacts per-job via `JobWorkspace`.
-- Conversion layer emits `PageImage` objects with image + text hints so OCR backends remain pluggable; OCR integrates with DeepSeek via an injectable `InferenceEngine`.
+- Conversion layer emits `PageImage` objects with rendered images so OCR backends remain pluggable; OCR integrates with DeepSeek via an injectable `InferenceEngine`.
 - Insight generation is deterministic through `InsightSummarizer` -> templates (`render_markdown/json/rich_text`) to keep API, CLI, and UI surfaces aligned.
 - FastAPI router stores job + submission state in an in-memory repository per process, while CLI/Streamlit share the same pipeline and persist manifests under `.deepread-store` (configurable through `DEEPREAD_STORE`).
 - Concurrency is controlled with bounded asyncio semaphores; workers stream status updates through `JobManager`.
@@ -46,7 +46,7 @@ Deepread orchestrates a document OCR insight pipeline that ingests office files,
 
 ## Domain Context
 
-- Converts PDFs, DOCX, XLSX, and HTML/HTM into page images, capturing text hints to support OCR retries and deterministic tests.
+- Converts PDFs, DOCX, XLSX, and HTML/HTM into page images ready for OCR processing.
 - OCR leverages DeepSeek via a vLLM engine (pending final wiring) with configurable prompts, retries, and confidence thresholds.
 - Insight reports synthesize OCR findings into summaries, recommended actions, warnings, and open questions and can be exported as Markdown, JSON, or RTF.
 - Batch processing returns manifests and per-submission remediation guidance; outputs are stored on the filesystem for retrieval across surfaces.

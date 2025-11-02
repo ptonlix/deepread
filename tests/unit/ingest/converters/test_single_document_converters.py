@@ -60,7 +60,6 @@ def test_convert_document_renders_page_images(
     first_page = pages[0]
     assert isinstance(first_page.image, Image.Image)
     assert first_page.image.size == PAGE_SIZE
-    assert expected_text in first_page.text_hint
 
 
 def test_pdf_conversion_requires_valid_pdf() -> None:

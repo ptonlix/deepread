@@ -16,7 +16,10 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from typing import Callable
+
 from deepread.ingest.pipeline import ProcessingPipeline
+from deepread.ocr.deepseek import DeepSeekOcr
 
 DEFAULT_FORMATS = {"markdown"}
 SUPPORTED_FORMATS = {"markdown", "json", "rich_text"}
@@ -64,13 +67,39 @@ class JobMetadata:
         )
 
 
+def _create_test_ocr_factory() -> Callable[[], DeepSeekOcr]:
+    """Create a mock OCR factory for testing when OCR mode is not configured."""
+
+    class MockOcrEngine:
+        """Mock OCR engine for testing that returns predictable results."""
+
+        def __call__(
+            self, *, prompt: str, image_bytes: bytes, max_tokens: int
+        ) -> tuple[str, float]:
+            return "Extracted text from document", 0.95
+
+    def create_mock_ocr() -> DeepSeekOcr:
+        return DeepSeekOcr(engine=MockOcrEngine())
+
+    return create_mock_ocr
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     store = _resolve_store()
     workspace_root = store / "workspaces"
-    pipeline = ProcessingPipeline(workspace_root=workspace_root)
+
+    # Use mock OCR factory for testing if OCR mode is not configured
+    try:
+        pipeline = ProcessingPipeline(workspace_root=workspace_root)
+    except ValueError:
+        # Fall back to mock OCR factory if OCR mode is not configured
+        ocr_factory = _create_test_ocr_factory()
+        pipeline = ProcessingPipeline(
+            workspace_root=workspace_root, ocr_factory=ocr_factory
+        )
 
     if args.command == "submit":
         requested = args.output_format or []

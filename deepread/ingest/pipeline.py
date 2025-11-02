@@ -156,20 +156,6 @@ class BatchResult:
     manifest_path: str
 
 
-class _EchoEngine:
-    """Default inference engine that echoes source text for deterministic tests."""
-
-    def __init__(self, text: str, confidence: float = 0.92) -> None:
-        self._text = text
-        self._confidence = confidence
-
-    def __call__(
-        self, *, prompt: str, image_bytes: bytes, max_tokens: int
-    ) -> tuple[str, float]:
-        _ = (prompt, image_bytes, max_tokens)
-        return self._text, self._confidence
-
-
 class ProcessingPipeline:
     """End-to-end pipeline transforming documents into insight reports."""
 
@@ -178,7 +164,7 @@ class ProcessingPipeline:
         *,
         workspace_root: Path | str,
         summarizer: InsightSummarizer | None = None,
-        ocr_factory: Callable[[str], DeepSeekOcr] | None = None,
+        ocr_factory: Callable[[], DeepSeekOcr] | None = None,
         ocr_mode: str | None = None,
         ocr_config: dict | None = None,
     ) -> None:
@@ -202,38 +188,23 @@ class ProcessingPipeline:
 
             self._ocr_factory = self._create_ocr_factory(config.ocr)
 
-    def _create_ocr_factory(self, ocr_config: Any) -> Callable[[str], DeepSeekOcr]:
+    def _create_ocr_factory(self, ocr_config: Any) -> Callable[[], DeepSeekOcr]:
         """Create OCR factory based on configuration."""
         if ocr_config.mode == "vllm_local":
-            try:
-                vllm_config = ocr_config.to_vllm_config()
-                engine = create_vllm_engine(mode="local", **vllm_config)
-                return lambda text: DeepSeekOcr(engine=engine)
-            except Exception as e:
-                # Fall back to echo engine if vLLM fails
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    f"Failed to initialize vLLM local engine: {e}. Falling back to echo engine."
-                )
-                return lambda text: DeepSeekOcr(engine=_EchoEngine(text))
+            vllm_config = ocr_config.to_vllm_config()
+            engine = create_vllm_engine(mode="local", **vllm_config)
+            return lambda: DeepSeekOcr(engine=engine)
 
         elif ocr_config.mode == "vllm_remote":
-            try:
-                vllm_config = ocr_config.to_vllm_config()
-                engine = create_vllm_engine(mode="remote", **vllm_config)
-                return lambda text: DeepSeekOcr(engine=engine)
-            except Exception as e:
-                # Fall back to echo engine if remote vLLM fails
-                import logging
+            vllm_config = ocr_config.to_vllm_config()
+            engine = create_vllm_engine(mode="remote", **vllm_config)
+            return lambda: DeepSeekOcr(engine=engine)
 
-                logging.getLogger(__name__).warning(
-                    f"Failed to initialize vLLM remote engine: {e}. Falling back to echo engine."
-                )
-                return lambda text: DeepSeekOcr(engine=_EchoEngine(text))
-
-        else:  # fallback mode
-            return lambda text: DeepSeekOcr(engine=_EchoEngine(text))
+        else:  # fallback mode or unknown mode
+            raise ValueError(
+                f"Unsupported OCR mode: {ocr_config.mode}. "
+                "Please configure a valid OCR mode (vllm_local or vllm_remote)."
+            )
 
     def process_document(
         self,
@@ -406,7 +377,7 @@ class ProcessingPipeline:
             image_path.parent.mkdir(parents=True, exist_ok=True)
             image_path.write_bytes(buffer.getvalue())
 
-            ocr = self._ocr_factory(page.text_hint)
+            ocr = self._ocr_factory()
             ocr_output = ocr.run(image_bytes=buffer.getvalue())
             page_insights.append(
                 PageInsight(

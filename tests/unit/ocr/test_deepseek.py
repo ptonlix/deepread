@@ -126,8 +126,9 @@ class TestVLLMEngines:
         mock_image = Mock()
         mock_image_module.open.return_value.convert.return_value = mock_image
 
-        with patch("deepread.ocr.deepseek.LLM") as mock_llm_class, patch(
-            "deepread.ocr.deepseek.Image", mock_image_module, create=True
+        with (
+            patch("deepread.ocr.deepseek.LLM") as mock_llm_class,
+            patch("deepread.ocr.deepseek.Image", mock_image_module, create=True),
         ):
             # Setup mocks
             mock_llm = Mock()
@@ -155,8 +156,9 @@ class TestVLLMEngines:
         # Create mock Image module
         mock_image_module = Mock()
 
-        with patch("deepread.ocr.deepseek.LLM") as mock_llm_class, patch(
-            "deepread.ocr.deepseek.Image", mock_image_module, create=True
+        with (
+            patch("deepread.ocr.deepseek.LLM") as mock_llm_class,
+            patch("deepread.ocr.deepseek.Image", mock_image_module, create=True),
         ):
             # Setup mocks
             mock_llm = Mock()

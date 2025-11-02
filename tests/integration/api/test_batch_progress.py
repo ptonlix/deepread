@@ -5,10 +5,23 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from deepread.api.router import create_app
+from deepread.ocr.deepseek import DeepSeekOcr
+
+
+class MockOcrEngine:
+    """Mock OCR engine for testing that returns predictable results."""
+
+    def __call__(
+        self, *, prompt: str, image_bytes: bytes, max_tokens: int
+    ) -> tuple[str, float]:
+        return "Extracted text from document", 0.95
 
 
 def test_batch_progress_records_failures(tmp_path: Path) -> None:
-    app = create_app(workspace_root=tmp_path / "workspace")
+    def create_mock_ocr() -> DeepSeekOcr:
+        return DeepSeekOcr(engine=MockOcrEngine())
+
+    app = create_app(workspace_root=tmp_path / "workspace", ocr_factory=create_mock_ocr)
     client = TestClient(app)
 
     files = [

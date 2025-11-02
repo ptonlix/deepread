@@ -2,9 +2,7 @@
 Document conversion entry points.
 
 Each supported format is transformed into a list of `PageImage` instances whose
-primary payload is a rendered canvas ready for OCR. The conversion step keeps
-lightweight text hints solely to aid deterministic tests and configurable OCR
-backends.
+primary payload is a rendered canvas ready for OCR.
 
 For PDF files, we preserve the original visual layout by converting pages directly
 to images rather than extracting text and re-rendering.
@@ -18,10 +16,7 @@ import tempfile
 import os
 
 from PIL import Image
-from bs4 import BeautifulSoup
-from docx import Document
 from openpyxl import load_workbook
-from pypdf import PdfReader
 import pandas as pd
 import imgkit
 
@@ -41,7 +36,6 @@ class PageImage:
 
     index: int
     image: Image.Image
-    text_hint: str
 
 
 def convert_document(payload: bytes, filename: str) -> list[PageImage]:
@@ -50,51 +44,43 @@ def convert_document(payload: bytes, filename: str) -> list[PageImage]:
     ensure_supported(extension)
 
     if extension in {"html", "htm"}:
-        # HTML returns (image, text) tuples - image must not be None
         html_pages = _convert_html(payload)
         return [
             PageImage(
                 index=idx,
                 image=image,
-                text_hint=text.strip(),
             )
-            for idx, (image, text) in enumerate(html_pages)
+            for idx, image in enumerate(html_pages)
             if image is not None
         ]
     elif extension == "docx":
-        # DOCX returns (image, text) tuples - image must not be None
         docx_pages = _convert_docx(payload)
         return [
             PageImage(
                 index=idx,
                 image=image,
-                text_hint=text.strip(),
             )
-            for idx, (image, text) in enumerate(docx_pages)
+            for idx, image in enumerate(docx_pages)
             if image is not None
         ]
     elif extension == "xlsx":
-        # XLSX returns (image, text) tuples - image must not be None
         xlsx_pages = _convert_xlsx(payload)
         return [
             PageImage(
                 index=idx,
                 image=image,
-                text_hint=text.strip(),
             )
-            for idx, (image, text) in enumerate(xlsx_pages)
+            for idx, image in enumerate(xlsx_pages)
             if image is not None
         ]
     elif extension == "pdf":
-        # PDF returns (image, text) tuples - image must not be None
         pdf_pages = _convert_pdf(payload)
         return [
             PageImage(
                 index=idx,
                 image=image,
-                text_hint=text.strip(),
             )
-            for idx, (image, text) in enumerate(pdf_pages)
+            for idx, image in enumerate(pdf_pages)
             if image is not None
         ]
     else:  # pragma: no cover - safeguarded by ensure_supported
@@ -106,7 +92,7 @@ def ensure_supported(extension: str) -> None:
         raise ValueError(f"Unsupported document format: {extension}")
 
 
-def _convert_html(payload: bytes) -> list[tuple[Image.Image | None, str]]:
+def _convert_html(payload: bytes) -> list[Image.Image | None]:
     """Convert HTML to images using html2image."""
     try:
         html_content = payload.decode("utf-8")
@@ -169,21 +155,18 @@ def _convert_html(payload: bytes) -> list[tuple[Image.Image | None, str]]:
                 image_path = os.path.join(temp_dir, "page.png")
                 if os.path.exists(image_path):
                     image = Image.open(image_path).copy()
-                    # Extract text for hint
-                    soup = BeautifulSoup(payload, "html.parser")
-                    text_hint = soup.get_text(separator="\n")
-                    return [(image, text_hint)]
+                    return [image]
 
         # If we reach here, conversion failed
-        return [(None, "")]
+        return [None]
     except Exception:
         # Return None image on any error
-        return [(None, "")]
+        return [None]
 
 
-def _convert_docx(payload: bytes) -> list[tuple[Image.Image | None, str]]:
+def _convert_docx(payload: bytes) -> list[Image.Image | None]:
     """Convert DOCX to images using docx2pdf and pdf2image."""
-    result: list[tuple[Image.Image | None, str]] = []
+    result: list[Image.Image | None] = []
 
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -201,25 +184,21 @@ def _convert_docx(payload: bytes) -> list[tuple[Image.Image | None, str]]:
                 pdf_payload = pdf_file.read()
                 images = convert_from_bytes(pdf_payload, dpi=300)
 
-            # Extract text from original DOCX for hints
-            doc = Document(docx_path)
-            text_hint = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-
-            # Create result with images and text hints
-            for i, image in enumerate(images):
+            # Create result with images
+            for image in images:
                 # Set DPI metadata for consistency
                 image.info["dpi"] = DPI
-                result.append((image, text_hint if i == 0 else ""))
+                result.append(image)
 
-            return result or [(None, text_hint)]
+            return result or [None]
     except Exception:
         # Return None image on any error
-        return [(None, "")]
+        return [None]
 
 
-def _convert_xlsx(payload: bytes) -> list[tuple[Image.Image | None, str]]:
+def _convert_xlsx(payload: bytes) -> list[Image.Image | None]:
     """Convert Excel to images using pandas and imgkit."""
-    result: list[tuple[Image.Image | None, str]] = []
+    result: list[Image.Image | None] = []
 
     # Load workbook with openpyxl to get sheet names
     workbook = load_workbook(io.BytesIO(payload), read_only=True)
@@ -340,56 +319,27 @@ def _convert_xlsx(payload: bytes) -> list[tuple[Image.Image | None, str]]:
                     image = Image.open(img_path).copy()
                     # Set DPI metadata for consistency
                     image.info["dpi"] = DPI
-
-                    # Create text hint from DataFrame
-                    text_hint = f"{sheet_name}\n" + df.to_string(index=False)
-
-                    result.append((image, text_hint))
+                    result.append(image)
                 else:
-                    # Fallback: create text hint only
-                    text_hint = f"{sheet_name}\n" + df.to_string(index=False)
-                    result.append((None, text_hint))
+                    # Fallback: no image available
+                    result.append(None)
 
             except Exception:
-                # Fallback to original text-based approach for this sheet
-                try:
-                    sheet = workbook[sheet_name]
-                    rows = []
-                    for row in sheet.iter_rows(values_only=True):
-                        cleaned = [str(cell) for cell in row if cell not in (None, "")]
-                        if cleaned:
-                            rows.append(", ".join(cleaned))
-                    if rows:
-                        text_hint = f"{sheet_name}\n" + "\n".join(rows)
-                        result.append((None, text_hint))
-                except Exception:
-                    # Last resort: empty sheet
-                    result.append((None, f"{sheet_name}\n(Empty or unreadable sheet)"))
+                # Fallback: no image available for this sheet
+                result.append(None)
 
-    return result or [(None, "Empty workbook")]
+    return result or [None]
 
 
-def _convert_pdf(payload: bytes) -> list[tuple[Image.Image | None, str]]:
+def _convert_pdf(payload: bytes) -> list[Image.Image | None]:
     """Convert PDF to images, preserving original visual layout."""
     # Convert PDF pages directly to images
     images = convert_from_bytes(payload, dpi=300)
-    result: list[tuple[Image.Image | None, str]] = []
+    result: list[Image.Image | None] = []
 
-    # Also extract text for hints using pypdf as fallback
-    buffer = io.BytesIO(payload)
-    try:
-        reader = PdfReader(buffer)
-        texts = [page.extract_text() or "" for page in reader.pages]
-    except Exception:
-        texts = [""] * len(images)
-
-    # Ensure we have text hints for all images
-    while len(texts) < len(images):
-        texts.append("")
-
-    for i, image in enumerate(images):
+    for image in images:
         # Set DPI metadata for consistency
         image.info["dpi"] = DPI
-        result.append((image, texts[i]))
+        result.append(image)
 
     return result

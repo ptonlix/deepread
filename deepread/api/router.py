@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from deepread.ingest.pipeline import BatchResult, ProcessingPipeline, SubmissionResult
+from deepread.ocr.deepseek import DeepSeekOcr
 
 
 @dataclass
@@ -51,12 +52,16 @@ class _JobRepository:
         return payload
 
 
-def create_app(*, workspace_root: Path | str | None = None) -> FastAPI:
+def create_app(
+    *,
+    workspace_root: Path | str | None = None,
+    ocr_factory: Callable[[], DeepSeekOcr] | None = None,
+) -> FastAPI:
     workspace = Path(workspace_root) if workspace_root else Path.cwd() / ".deepread-api"
     workspace.mkdir(parents=True, exist_ok=True)
 
     repository = _JobRepository(jobs={}, submissions={})
-    pipeline = ProcessingPipeline(workspace_root=workspace)
+    pipeline = ProcessingPipeline(workspace_root=workspace, ocr_factory=ocr_factory)
 
     router = APIRouter()
 
@@ -132,4 +137,17 @@ def create_app(*, workspace_root: Path | str | None = None) -> FastAPI:
 
 
 # Convenience application instance for ASGI servers
-app = create_app()
+# Note: This is lazily initialized to avoid failures when OCR mode is not configured.
+# ASGI servers (e.g., uvicorn, gunicorn) can start the app via: uvicorn deepread.api.router:app
+# In production, configure OCR mode via environment variables or pass ocr_factory to create_app().
+_app: FastAPI | None = None
+
+
+def __getattr__(name: str) -> FastAPI:
+    """Lazy initialization of the module-level 'app' for ASGI servers."""
+    global _app
+    if name == "app":
+        if _app is None:
+            _app = create_app()
+        return _app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
