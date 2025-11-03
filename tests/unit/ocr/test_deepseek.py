@@ -19,14 +19,32 @@ class FakeEngine:
         self.invocations: list[dict[str, object]] = []
 
     def __call__(
-        self, *, prompt: str, image_bytes: bytes, max_tokens: int
-    ) -> tuple[str, float]:
+        self, *, prompt: str, image_bytes: bytes | list[bytes], max_tokens: int
+    ) -> tuple[str, float] | list[tuple[str, float]]:
+        is_batch = isinstance(image_bytes, list)
+        if is_batch:
+            image_list = image_bytes
+        else:
+            image_list = [image_bytes]
+
         self.invocations.append(
             {"prompt": prompt, "image_bytes": image_bytes, "max_tokens": max_tokens}
         )
         if not self._responses:
             raise RuntimeError("No more responses configured")
-        return self._responses.pop(0)
+
+        if is_batch:
+            # Return list of responses for batch
+            batch_results = []
+            for _ in image_list:
+                if self._responses:
+                    batch_results.append(self._responses.pop(0))
+                else:
+                    batch_results.append(("", 0.0))
+            return batch_results
+        else:
+            # Return single response for single image
+            return self._responses.pop(0)
 
 
 def make_ocr(responses: list[tuple[str, float]], **kwargs) -> DeepSeekOcr:
@@ -119,6 +137,7 @@ class TestVLLMEngines:
 
     @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
     @patch("deepread.ocr.deepseek.NGramPerReqLogitsProcessor", Mock())
+    @patch("deepread.ocr.deepseek.SamplingParams", Mock())
     def test_vllm_local_engine_inference(self):
         """Test VLLMLocalEngine inference call."""
         # Create mock Image module
@@ -141,9 +160,12 @@ class TestVLLMEngines:
 
             # Test inference
             engine = VLLMLocalEngine(model_name="test-model")
-            result_text, confidence = engine(
+            result = engine(
                 prompt="Extract text", image_bytes=b"fake_image", max_tokens=100
             )
+            # Single image input should return tuple
+            assert isinstance(result, tuple)
+            result_text, confidence = result
 
             assert result_text == "extracted text"
             assert 0.0 <= confidence <= 1.0
@@ -151,6 +173,7 @@ class TestVLLMEngines:
 
     @patch("deepread.ocr.deepseek.VLLM_AVAILABLE", True)
     @patch("deepread.ocr.deepseek.NGramPerReqLogitsProcessor", Mock())
+    @patch("deepread.ocr.deepseek.SamplingParams", Mock())
     def test_vllm_local_engine_inference_error(self):
         """Test VLLMLocalEngine error handling during inference."""
         # Create mock Image module

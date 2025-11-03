@@ -12,7 +12,7 @@ import io
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, cast
 
 try:
     from vllm import LLM, SamplingParams
@@ -24,6 +24,9 @@ except ImportError:
     VLLM_AVAILABLE = False
     # Type stub for when vLLM is not available
     NGramPerReqLogitsProcessor = None
+    LLM = None  # type: ignore[assignment,misc]
+    SamplingParams = None  # type: ignore[assignment,misc]
+    Image = None  # type: ignore[assignment]
 
 DEFAULT_PROMPT = "Extract readable text from the supplied document page."
 DEFAULT_RETRY_SUFFIX = (
@@ -35,8 +38,8 @@ class InferenceEngine(Protocol):
     """Protocol capturing the pieces of vLLM we care about."""
 
     def __call__(
-        self, *, prompt: str, image_bytes: bytes, max_tokens: int
-    ) -> tuple[str, float]:
+        self, *, prompt: str, image_bytes: bytes | list[bytes], max_tokens: int
+    ) -> tuple[str, float] | list[tuple[str, float]]:
         ...
 
 
@@ -79,11 +82,21 @@ class DeepSeekOcr:
         result_confidence = 0.0
 
         for attempt in range(attempts):
-            result_text, result_confidence = self.engine(
+            result = self.engine(
                 prompt=prompt,
                 image_bytes=image_bytes,
                 max_tokens=self.max_tokens,
             )
+            # For single image input, engine should return tuple[str, float]
+            if isinstance(result, list):
+                # Unexpected: got list for single input, use first result
+                if result:
+                    result_text, result_confidence = result[0]
+                else:
+                    result_text, result_confidence = "", 0.0
+            else:
+                result_text, result_confidence = result
+
             if result_confidence >= self.confidence_threshold:
                 if attempt > 0:
                     warnings.append(f"OCR succeeded after {attempt} retry.")
@@ -103,6 +116,63 @@ class DeepSeekOcr:
         return OcrOutput(
             text=result_text, confidence=result_confidence, warnings=warnings
         )
+
+    def run_batch(self, *, image_bytes_list: list[bytes]) -> list[OcrOutput]:
+        """Perform OCR on multiple images in batch for better efficiency.
+
+        Args:
+            image_bytes_list: List of image bytes to process
+
+        Returns:
+            List of OcrOutput results corresponding to each input image
+        """
+        if not image_bytes_list:
+            return []
+
+        prompt = self.base_prompt
+        results = self.engine(
+            prompt=prompt,
+            image_bytes=image_bytes_list,
+            max_tokens=self.max_tokens,
+        )
+
+        # Type check: should be list when batch input is provided
+        if not isinstance(results, list):
+            # Fallback if engine returns single result unexpectedly
+            single_result = results if isinstance(results, tuple) else ("", 0.0)
+            return [
+                OcrOutput(
+                    text=single_result[0], confidence=single_result[1], warnings=[]
+                )
+            ]
+
+        # Process batch results
+        outputs = []
+        for result_tuple in results:
+            if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
+                outputs.append(OcrOutput(text="", confidence=0.0, warnings=[]))
+                continue
+
+            result_text, result_confidence = result_tuple
+            warnings: list[str] = []
+
+            # For batch processing, we skip per-item retries to maintain efficiency
+            # If confidence is low, we still return the result but with a warning
+            if result_confidence < self.confidence_threshold:
+                warnings.append(
+                    f"OCR confidence below threshold (score={result_confidence:.2f}). "
+                    "Consider using single-image processing with retries for better results."
+                )
+
+            outputs.append(
+                OcrOutput(
+                    text=result_text,
+                    confidence=result_confidence,
+                    warnings=warnings,
+                )
+            )
+
+        return outputs
 
 
 @dataclass
@@ -140,7 +210,7 @@ class VLLMLocalEngine:
                 "Make sure you're using vLLM 0.11.0+ with DeepSeek-OCR support."
             )
 
-        self._llm: LLM | None = None
+        self._llm: Any = None
         self._logger = logging.getLogger(__name__)
 
     def _ensure_initialized(self) -> None:
@@ -150,6 +220,14 @@ class VLLMLocalEngine:
 
             if not VLLM_AVAILABLE:
                 raise ImportError("vLLM not available")
+
+            # At runtime, VLLM_AVAILABLE check ensures LLM and NGramPerReqLogitsProcessor are available
+            assert (
+                LLM is not None
+            ), "LLM should be available when VLLM_AVAILABLE is True"
+            assert (
+                NGramPerReqLogitsProcessor is not None
+            ), "NGramPerReqLogitsProcessor should be available when VLLM_AVAILABLE is True"
 
             self._llm = LLM(
                 model=self.model_name,
@@ -164,29 +242,63 @@ class VLLMLocalEngine:
             )
 
     def __call__(
-        self, *, prompt: str, image_bytes: bytes, max_tokens: int
-    ) -> tuple[str, float]:
-        """Execute OCR inference using local vLLM engine."""
+        self, *, prompt: str, image_bytes: bytes | list[bytes], max_tokens: int
+    ) -> tuple[str, float] | list[tuple[str, float]]:
+        """Execute OCR inference using local vLLM engine.
+
+        Args:
+            prompt: OCR prompt text
+            image_bytes: Single image bytes or list of image bytes for batch processing
+            max_tokens: Maximum tokens for generation
+
+        Returns:
+            For single image: tuple of (text, confidence)
+            For batch images: list of tuples (text, confidence)
+        """
         self._ensure_initialized()
 
+        # Handle batch processing
+        is_batch = isinstance(image_bytes, list)
+        if is_batch:
+            # Type narrowing: when is_batch is True, image_bytes is list[bytes]
+            image_list = cast(list[bytes], image_bytes)
+        else:
+            # Type narrowing: when is_batch is False, image_bytes is bytes
+            single_bytes = cast(bytes, image_bytes)
+            image_list = [single_bytes]
+
         try:
-            # Convert bytes to PIL Image
             if not VLLM_AVAILABLE:
                 raise ImportError("vLLM not available")
-            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+            # Convert all image bytes to PIL Images
+            # At runtime, VLLM_AVAILABLE check ensures Image is available
+            assert (
+                Image is not None
+            ), "Image should be available when VLLM_AVAILABLE is True"
+            images = [
+                Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                for img_bytes in image_list
+            ]
 
             # Prepare prompt with image token
             ocr_prompt = f"<image>\n{prompt}"
 
-            # Prepare input in the correct format for vLLM
-            model_input = [
+            # Prepare batched input in the correct format for vLLM
+            # vLLM's generate accepts this multi-modal format for DeepSeek-OCR
+            model_input: list[dict[str, Any]] = [
                 {
                     "prompt": ocr_prompt,
                     "multi_modal_data": {"image": image},
                 }
+                for image in images
             ]
 
             # Create sampling params with ngram processor arguments
+            # At runtime, VLLM_AVAILABLE check ensures SamplingParams is available
+            assert (
+                SamplingParams is not None
+            ), "SamplingParams should be available when VLLM_AVAILABLE is True"
             sampling_params = SamplingParams(
                 temperature=self.temperature,
                 max_tokens=max_tokens,
@@ -201,21 +313,31 @@ class VLLMLocalEngine:
             # Generate output
             if self._llm is None:
                 raise RuntimeError("LLM not initialized")
-            outputs = self._llm.generate(model_input, sampling_params)  # type: ignore[arg-type]
+            # vLLM's generate method accepts multi-modal input format for DeepSeek-OCR
+            # The type checker may not recognize this format, but it's correct at runtime
+            # Cast to Any to work around vLLM's type definitions for multi-modal inputs
+            outputs = self._llm.generate(cast(Any, model_input), sampling_params)
 
-            if not outputs or not outputs[0].outputs:
-                return "", 0.0
+            if not outputs:
+                return [] if is_batch else ("", 0.0)
 
-            result_text = outputs[0].outputs[0].text.strip()
+            # Process all outputs
+            results = []
+            for output in outputs:
+                if not output.outputs:
+                    results.append(("", 0.0))
+                    continue
 
-            # Calculate confidence based on text quality heuristics
-            confidence = self._calculate_confidence(result_text)
+                result_text = output.outputs[0].text.strip()
+                confidence = self._calculate_confidence(result_text)
+                results.append((result_text, confidence))
 
-            return result_text, confidence
+            # Return single result for backward compatibility or list for batch
+            return results if is_batch else results[0]
 
         except Exception as e:
             self._logger.error(f"vLLM inference failed: {e}", exc_info=True)
-            return "", 0.0
+            return [] if is_batch else ("", 0.0)
 
     def _calculate_confidence(self, text: str) -> float:
         """Calculate confidence score based on text quality heuristics."""
@@ -259,12 +381,15 @@ class VLLMRemoteEngine:
         self._logger = logging.getLogger(__name__)
 
     def __call__(
-        self, *, prompt: str, image_bytes: bytes, max_tokens: int
-    ) -> tuple[str, float]:
+        self, *, prompt: str, image_bytes: bytes | list[bytes], max_tokens: int
+    ) -> tuple[str, float] | list[tuple[str, float]]:
         """Execute OCR inference using remote vLLM service."""
         # This is a placeholder for remote inference
         # In practice, you would implement HTTP/gRPC calls to a remote vLLM service
+        is_batch = isinstance(image_bytes, list)
         self._logger.warning("Remote vLLM inference not yet implemented")
+        if is_batch:
+            return [("", 0.0) for _ in image_bytes]
         return "", 0.0
 
 

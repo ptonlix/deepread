@@ -74,9 +74,13 @@ def _create_test_ocr_factory() -> Callable[[], DeepSeekOcr]:
         """Mock OCR engine for testing that returns predictable results."""
 
         def __call__(
-            self, *, prompt: str, image_bytes: bytes, max_tokens: int
-        ) -> tuple[str, float]:
-            return "Extracted text from document", 0.95
+            self, *, prompt: str, image_bytes: bytes | list[bytes], max_tokens: int
+        ) -> tuple[str, float] | list[tuple[str, float]]:
+            is_batch = isinstance(image_bytes, list)
+            result = ("Extracted text from document", 0.95)
+            if is_batch:
+                return [result for _ in image_bytes]
+            return result
 
     def create_mock_ocr() -> DeepSeekOcr:
         return DeepSeekOcr(engine=MockOcrEngine())

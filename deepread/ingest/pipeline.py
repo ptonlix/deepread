@@ -367,21 +367,37 @@ class ProcessingPipeline:
     ) -> list[PageInsight]:
         from io import BytesIO
 
-        page_insights: list[PageInsight] = []
-        for page in page_images:
+        # Collect all pages and their image bytes for batch processing
+        pages_list = list(page_images)
+        if not pages_list:
+            return []
+
+        page_buffers: list[bytes] = []
+        page_indices: list[int] = []
+
+        for page in pages_list:
             buffer = BytesIO()
             page.image.save(buffer, format="PNG", dpi=DPI)
             buffer.seek(0)
 
             image_path = workspace.images_dir / f"page-{page.index + 1:04d}.png"
             image_path.parent.mkdir(parents=True, exist_ok=True)
-            image_path.write_bytes(buffer.getvalue())
+            image_bytes = buffer.getvalue()
+            image_path.write_bytes(image_bytes)
 
-            ocr = self._ocr_factory()
-            ocr_output = ocr.run(image_bytes=buffer.getvalue())
+            page_buffers.append(image_bytes)
+            page_indices.append(page.index)
+
+        # Batch process all images at once for better efficiency
+        ocr = self._ocr_factory()
+        ocr_outputs = ocr.run_batch(image_bytes_list=page_buffers)
+
+        # Map OCR results back to pages using their indices
+        page_insights: list[PageInsight] = []
+        for idx, ocr_output in enumerate(ocr_outputs):
             page_insights.append(
                 PageInsight(
-                    page_index=page.index,
+                    page_index=page_indices[idx],
                     text=ocr_output.text,
                     confidence=ocr_output.confidence,
                 )
